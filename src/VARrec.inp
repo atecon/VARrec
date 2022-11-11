@@ -1,0 +1,199 @@
+function void addname (bundle *b)
+    list endo = b.mendo
+    list exo = b.mexo
+    strings vendo = varnames(endo)
+    strings vexo = varnames(exo)
+    strings xlist = null
+    loop i=1..nelem(endo) -q
+        loop k=1..b.p -q
+            sprintf S1 "%s_%d", vendo[$i], $k
+            xlist += S1
+        endloop
+    endloop
+    loop i=1..nelem(exo) -q
+        string S1 = vexo[$i]
+        if S1=="const"
+            strings Sconst = defarray("const")
+            xlist = Sconst + xlist
+        else
+            xlist += S1
+        endif
+    endloop
+    b.xlist = xlist
+end function
+
+function scalar do_plot (series beta,
+                         series se,
+                         scalar cilevel,
+                         string dest,
+                         string plotopt,
+                         string ylab,
+                         string title,
+                         scalar fsize,
+                         scalar linew)
+    catch plot beta
+        option band=beta,se,cilevel
+        option band-style=dash,black
+        options with-lines time-series
+        literal set y2tics
+        literal set style line 11 lc rgb "#808080" lt 1
+        literal set border 3 back ls 11
+
+        literal set style line 12 lc rgb "#808080" lt 0 lw 1
+        literal set grid back ls 12
+        literal @plotopt
+        printf "set ylabel \"%s\"", ylab
+        printf "set title \"%s\"", title
+    end plot --output="@dest"
+    return $error
+end function
+
+
+function bundle setupVARrec (const list endo,
+                             const list exo,
+                             int p[1::] "Lag length in levels",
+                             int which[1::] "Select variable to plot",
+                             int rectype[0:1:] "Direct. of recursion" {"Forward", "Backward"},
+                             scalar cilevel "S.E. for CI bands",
+                             int rob[0:2:0] "Robust S.E." {"none", "HC", "HAC"},
+                             string plotout "'display' or e.g. '/home/USER/gretl'",
+                             int fsize[8::12] "plot: font size",
+                             scalar linew[0.5::1.5] "plot: line width",
+                             int verb[0:1:0] "Print details" {"No", "Yes"})
+    bundle b
+    matrix b.mendo = endo
+    matrix b.mexo = exo
+    b.p = p
+    b.sel = which
+    scalar b.rectype = rectype
+    b.cilevel = cilevel
+    string b.plotout = plotout
+    scalar b.rob = rob
+    b.verb = verb
+    b.fsize = fsize
+    b.linew = linew
+    return b
+end function
+
+function void VARrec (bundle *b)
+    list endo = b.mendo
+    list exo = b.mexo
+    n_endo = nelem(endo)
+    n_exo = nelem(exo)
+    T = max(rows({endo})~rows({exo}))
+    nvar = b.p*(n_endo)+n_exo
+    scalar rob = b.rob
+    if b.rectype == 0
+        scalar start = $t1 + nvar + int(0.1*T)
+        scalar steps = $t2 - start + 1
+        smpl $t1 start
+        string b.firstob = obslabel($t2)
+    elif b.rectype == 1
+        start = $t2 - nvar - int(0.1*T)
+
+        scalar steps = $t2 - $t1  - nvar - int(0.1*T)
+        smpl start ;
+        string b.lastob = obslabel($t1)
+    endif
+    matrix coeff = zeros(steps,n_endo)
+    matrix se = zeros(steps,n_endo)
+    if b.verb==1
+        string sil = ""
+    else
+        string sil = "--silent"
+    endif
+    if rob==0
+        string Srob = ""
+    elif rob==1
+        string Srob = "--robust"
+    elif rob==2
+        string Srob = "--robust-hac"
+    endif
+    loop i=1..steps -q
+
+        list lexo = null
+        loop foreach k exo -q
+            if sum(exo.$k)>0
+                lexo+=exo.$k
+            endif
+            if isconst(exo.$k) && {exo.$k}!=1
+                lexo-=exo.$k
+            endif
+        endloop
+        catch var b.p endo ; lexo @Srob @sil
+        if $error
+            printf "***Note: Numerical problems occured for the sample %s--%s.***\n", obslabel($t1), obslabel($t2)
+            printf "***This specific sub-sample will be discarded.***\n"
+            printf "\n"
+        else
+            coeff[i,] = $coeff[b.sel,]
+            se[i,] = $stderr[b.sel,]
+        endif
+        if b.rectype == 0
+            if i<steps
+                smpl ; +1
+            else
+                string b.lastob = obslabel($t2)
+            endif
+        elif b.rectype == 1
+            if i<steps
+                smpl -1 ;
+            else
+                string b.firstob = obslabel($t1)
+            endif
+        endif
+    endloop
+    b.coeff = coeff
+    b.se = se
+    if se==0
+        printf "!!! Note: No valid estimates exist. Re-specify your model. !!!\n"
+    endif
+    printf "\n*** VARrec Package ***\n"
+    printf "First observation: %s; Last observation: %s\n", b.firstob, b.lastob
+end function
+
+function void VARrecplot (bundle *b)
+    string firstob = b.firstob
+    string lastob = b.lastob
+    smpl @firstob @lastob
+    scalar cilevel = b.cilevel
+    string plotout = b.plotout
+    if b.rectype==0
+        string title = "Forward recursive coefficient estimate"
+    elif b.rectype==1
+        string title = "Backward recursive coefficient estimate"
+    endif
+
+    addname(&b)
+    list endo = b.mendo
+    strings vendo = varnames(endo)
+
+    loop i=1..cols(b.mendo) -q
+        series beta_eq$i = b.coeff[,i]
+        series se_eq$i = b.se[,i]
+        beta_eq$i = zeromiss(beta_eq$i)
+        se_eq$i = zeromiss(se_eq$i)
+        string ylab = sprintf("Coefficient of %s in eq. of %s (%.2f S.E.)",
+                              b.xlist[b.sel], vendo[i], b.cilevel)
+
+        if plotout!="display"
+            if b.rectype==0
+                string S2 = "FORW"
+            elif b.rectype==1
+                string S2 = "BACKW"
+            endif
+            string dest = sprintf("@plotout/recVAR_@S2_%s_in eq_%s.pdf",
+                                  b.xlist[b.sel], vendo[i])
+            string plotopt = sprintf("set term pdf font 'Helvetica,%d' lw %d",
+                                     b.fsize, b.linew)
+        else
+            string dest = plotout
+            plotopt = ""
+        endif
+        scalar errcode = do_plot(beta_eq$i, se_eq$i, cilevel, dest, plotopt, ylab, title, b.fsize, b.linew)
+        if errcode != 0
+            printf "Error: Please check the options for the plot!\n"
+            break
+        endif
+    endloop
+end function
