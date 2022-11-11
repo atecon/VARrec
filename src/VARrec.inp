@@ -6,8 +6,7 @@ function void addname (bundle *b)
     strings xlist = null
     loop i=1..nelem(endo) -q
         loop k=1..b.p -q
-            sprintf S1 "%s_%d", vendo[$i], $k
-            xlist += S1
+            xlist += sprintf("%s_%d", vendo[$i], $k)
         endloop
     endloop
     loop i=1..nelem(exo) -q
