@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gretl-functions>
+<gretl-function-package name="VARrec" needs-time-series-data="true" minver="2020a">
+<author email="atecon@posteo.de">Artur Tarassow</author>
+<version>0.3</version>
+<date>2022-11-11</date>
+<description>Compute VAR model estimates recursively</description>
+<tags>C32 C52</tags>
+<help>
+# VARrec
+
+This package computes VAR model coefficient estimates recursively
+(backward or forward), and presents the results in a plot.
+
+Recursive parameter estimates are a simple descriptive tool for assessing
+parameter stability. They are obtained by estimating the model using only
+t=1,...,tau observations letting tau vary from some small value to T, the sample
+end (forward recursion). Backward recursion starts from the sub-sample t=T,...,
+tau and adds sequentially one observation until the first sample period is
+reached. Sequences of coefficient estimates are obtained.
+
+This package plots the sequence of all parameter estimates over time with its
+'confidence intervals'.
+
+Please ask questions and report bugs on the gretl mailing list if possible. Alternatively, create an issue ticket on the github repo (see below).
+Source code and test script(s) can be found here:
+https://github.com/atecon/VARrec
+
+
+# Public functions
+
+## setupVARrec()
+    Initially set up the bundle for the following analysis.
+
+    Parameters:
+    endo        - list, Endogenous series
+    exo         - list, Exogenous series
+    p           - int, Lag length of the VAR in levels
+    which       - int, Position of variable in 'endo' to plot
+    rectype     - int, If 0 run recursion forward, if 1 then backward
+    cilevel     - scalar, Width of the confidence band in std. deviations
+    rob         - int, 0=none, 1= HC, 2=HAC robust std. errors
+    plotout     - string, Path+filename for storing plot or &quot;display&quot; for
+                  immediately showing up on screen
+    fsize       - int, Font size for plot
+    linew       - scalar, Line width for plot
+    verb        - int, 1=Print details, 0=Print no details
+
+    Returns:
+    Bundle holding parameters.
+
+## VARrec()
+    Function actually executing parameter estimates.
+
+    Parameters:
+    self        - bundle, Returned bundle in pointer form by the setupVARrec()
+                  function.
+
+    Returns:
+    Nothing.
+
+
+## VARrecplot()
+    Function for plotting recursive parameter estimates.
+
+    Parameters:
+    self        - bundle, Returned by in pointer form by VARrec() the function
+
+
+    Return:
+    Error code which is zero (FALSE) in case of no error.
+
+
+# Changelog
+0.3 (11-2022)
+    - get rid of deprecated `sprintf` command
+0.24 (02-2017)
+0.23 (10-2016)
+   - Minor changes
+0.22 (10-2016)
+   - Minor changes
+   - Added the do_plot function
+0.21 (09-2016)
+    - Some minor changes w.r.t. to the VARrecplot function
+0.2 (09-2016)
+   - Add some hint s for the user in case of problems.
+   - Allow to manipulate the font size and line width of the plot
+0.1 (09-2016)
+   - Forward and backward recursive estimates
+   - Dummies are allowed. It is pre-tested whether the dummy takes
+       only zeros for the currently selected sub-sample or not.
+</help>
+<gretl-function name="setupVARrec" type="bundle">
+ <params count="11">
+  <param name="endo" type="list" const="true"/>
+  <param name="exo" type="list" const="true"/>
+  <param name="p" type="int" min="1">
+<description>Lag length in levels</description>
+  </param>
+  <param name="which" type="int" min="1">
+<description>Select variable to plot</description>
+  </param>
+  <param name="rectype" type="int" min="0" max="1">
+<description>Direct. of recursion</description>
+<labels count="2">
+"Forward" "Backward" </labels>
+  </param>
+  <param name="cilevel" type="scalar">
+<description>S.E. for CI bands</description>
+  </param>
+  <param name="rob" type="int" min="0" max="2" default="0">
+<description>Robust S.E.</description>
+<labels count="3">
+"none" "HC" "HAC" </labels>
+  </param>
+  <param name="plotout" type="string">
+<description>'display' or e.g. '/home/USER/gretl'</description>
+  </param>
+  <param name="fsize" type="int" min="8" default="12">
+<description>plot: font size</description>
+  </param>
+  <param name="linew" type="scalar" min="0.5" default="1.5">
+<description>plot: line width</description>
+  </param>
+  <param name="verb" type="int" min="0" max="1" default="0">
+<description>Print details</description>
+<labels count="2">
+"No" "Yes" </labels>
+  </param>
+ </params>
+<code>bundle b
+matrix b.mendo = endo
+matrix b.mexo = exo
+b.p = p
+b.sel = which
+scalar b.rectype = rectype
+b.cilevel = cilevel
+string b.plotout = plotout
+scalar b.rob = rob
+b.verb = verb
+b.fsize = fsize
+b.linew = linew
+return b
+</code>
+</gretl-function>
+<gretl-function name="VARrec" type="void">
+ <params count="1">
+  <param name="b" type="bundleref"/>
+ </params>
+<code>list endo = b.mendo
+list exo = b.mexo
+n_endo = nelem(endo)
+n_exo = nelem(exo)
+T = max(rows({endo})~rows({exo}))
+nvar = b.p*(n_endo)+n_exo
+scalar rob = b.rob
+if b.rectype == 0
+  scalar start = $t1 + nvar + int(0.1*T)
+  scalar steps = $t2 - start + 1
+  smpl $t1 start
+  string b.firstob = obslabel($t2)
+elif b.rectype == 1
+  start = $t2 - nvar - int(0.1*T)
+  scalar steps = $t2 - $t1  - nvar - int(0.1*T)
+  smpl start ;
+  string b.lastob = obslabel($t1)
+endif
+matrix coeff = zeros(steps,n_endo)
+matrix se = zeros(steps,n_endo)
+if b.verb==1
+  string sil = &quot;&quot;
+else
+  string sil = &quot;--silent&quot;
+endif
+if rob==0
+  string Srob = &quot;&quot;
+elif rob==1
+  string Srob = &quot;--robust&quot;
+elif rob==2
+  string Srob = &quot;--robust-hac&quot;
+endif
+loop i=1..steps -q
+  list lexo = null
+  loop foreach k exo -q
+    if sum(exo.$k)&gt;0
+      lexo+=exo.$k
+    endif
+    if isconst(exo.$k) &amp;&amp; {exo.$k}!=1
+      lexo-=exo.$k
+    endif
+  endloop
+  catch var b.p endo ; lexo @Srob @sil
+  if $error
+    printf &quot;***Note: Numerical problems occured for the sample %s--%s.***\n&quot;, obslabel($t1), obslabel($t2)
+    printf &quot;***This specific sub-sample will be discarded.***\n&quot;
+    printf &quot;\n&quot;
+  else
+    coeff[i,] = $coeff[b.sel,]
+    se[i,] = $stderr[b.sel,]
+  endif
+  if b.rectype == 0
+    if i&lt;steps
+      smpl ; +1
+    else
+      string b.lastob = obslabel($t2)
+    endif
+  elif b.rectype == 1
+    if i&lt;steps
+      smpl -1 ;
+    else
+      string b.firstob = obslabel($t1)
+    endif
+  endif
+endloop
+b.coeff = coeff
+b.se = se
+if se==0
+  printf &quot;!!! Note: No valid estimates exist. Re-specify your model. !!!\n&quot;
+endif
+printf &quot;\n*** VARrec Package ***\n&quot;
+printf &quot;First observation: %s; Last observation: %s\n&quot;, b.firstob, b.lastob
+</code>
+</gretl-function>
+<gretl-function name="VARrecplot" type="void">
+ <params count="1">
+  <param name="b" type="bundleref"/>
+ </params>
+<code>string firstob = b.firstob
+string lastob = b.lastob
+smpl @firstob @lastob
+scalar cilevel = b.cilevel
+string plotout = b.plotout
+if b.rectype==0
+  string title = &quot;Forward recursive coefficient estimate&quot;
+elif b.rectype==1
+  string title = &quot;Backward recursive coefficient estimate&quot;
+endif
+addname(&amp;b)
+list endo = b.mendo
+strings vendo = varnames(endo)
+loop i=1..cols(b.mendo) -q
+  series beta_eq$i = b.coeff[,i]
+  series se_eq$i = b.se[,i]
+  beta_eq$i = zeromiss(beta_eq$i)
+  se_eq$i = zeromiss(se_eq$i)
+  string ylab = sprintf(&quot;Coefficient of %s in eq. of %s (%.2f S.E.)&quot;, b.xlist[b.sel], vendo[i], b.cilevel)
+  if plotout!=&quot;display&quot;
+    if b.rectype==0
+      string S2 = &quot;FORW&quot;
+    elif b.rectype==1
+      string S2 = &quot;BACKW&quot;
+    endif
+    string dest = sprintf(&quot;@plotout/recVAR_@S2_%s_in eq_%s.pdf&quot;, b.xlist[b.sel], vendo[i])
+    string plotopt = sprintf(&quot;set term pdf font 'Helvetica,%d' lw %d&quot;, b.fsize, b.linew)
+  else
+    string dest = plotout
+    plotopt = &quot;&quot;
+  endif
+  scalar errcode = do_plot(beta_eq$i, se_eq$i, cilevel, dest, plotopt, ylab, title, b.fsize, b.linew)
+  if errcode != 0
+    printf &quot;Error: Please check the options for the plot!\n&quot;
+    break
+  endif
+endloop
+</code>
+</gretl-function>
+<gretl-function name="addname" type="void" private="1">
+ <params count="1">
+  <param name="b" type="bundleref"/>
+ </params>
+<code>list endo = b.mendo
+list exo = b.mexo
+strings vendo = varnames(endo)
+strings vexo = varnames(exo)
+strings xlist = null
+loop i=1..nelem(endo) -q
+  loop k=1..b.p -q
+    xlist += sprintf(&quot;%s_%d&quot;, vendo[$i], $k)
+  endloop
+endloop
+loop i=1..nelem(exo) -q
+  string S1 = vexo[$i]
+  if S1==&quot;const&quot;
+    strings Sconst = defarray(&quot;const&quot;)
+    xlist = Sconst + xlist
+  else
+    xlist += S1
+  endif
+endloop
+b.xlist = xlist
+</code>
+</gretl-function>
+<gretl-function name="do_plot" type="scalar" private="1">
+ <params count="9">
+  <param name="beta" type="series"/>
+  <param name="se" type="series"/>
+  <param name="cilevel" type="scalar"/>
+  <param name="dest" type="string"/>
+  <param name="plotopt" type="string"/>
+  <param name="ylab" type="string"/>
+  <param name="title" type="string"/>
+  <param name="fsize" type="scalar"/>
+  <param name="linew" type="scalar"/>
+ </params>
+<code>catch plot beta
+  option band=beta,se,cilevel
+  option band-style=dash,black
+  options with-lines time-series
+  literal set y2tics
+  literal set style line 11 lc rgb &quot;#808080&quot; lt 1
+  literal set border 3 back ls 11
+  literal set style line 12 lc rgb &quot;#808080&quot; lt 0 lw 1
+  literal set grid back ls 12
+  literal @plotopt
+  printf &quot;set ylabel \&quot;%s\&quot;&quot;, ylab
+  printf &quot;set title \&quot;%s\&quot;&quot;, title
+end plot --output=&quot;@dest&quot;
+return $error
+</code>
+</gretl-function>
+<sample-script>
+set verbose off
+include VARrec.gfn
+
+open denmark.gdt -q
+
+#------------------
+# VAR specification
+#------------------
+list endo = LRM LRY
+series DUM = (obs == 1974:4)
+list exo = const DUM
+scalar rob = 0          # 0:none, 1:HC, 2=HAC
+scalar p = 2            # lag length in levels (only of endogenous)
+
+# Select the variable (position in VAR) you want to plot over all equations
+scalar sel = 3
+scalar rectype = 0      # 0:forward, 1=backward
+scalar cilevel = 1.96
+string plotout = &quot;display&quot; # or: &quot;PATH + FILENAME&quot;
+scalar linew = 2
+scalar fsize = 12
+
+#------------------
+# Run the procedure
+#------------------
+bundle Vb = setupVARrec(endo, exo, p, sel,
+                        rectype, cilevel, rob,
+                        plotout, fsize, linew)
+VARrec(&amp;Vb)
+VARrecplot(&amp;Vb)
+</sample-script>
+</gretl-function-package>
+</gretl-functions>
