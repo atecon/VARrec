@@ -1,36 +1,30 @@
-clear
 set verbose off
-set datacols 8
-include PanelTools.gfn
+include VARrec.gfn
 
-open grunfeld.gdt --quiet
+open denmark.gdt -q
 
-panelinfo()
+#------------------
+# VAR specification
+#------------------
+list endo = LRM LRY
+series DUM = (obs == 1974:4)
+list exo = const DUM
+scalar rob = 0          # 0:none, 1:HC, 2=HAC
+scalar p = 2            # lag length in levels (only of endogenous)
 
-series invest_pfirst = pfirst(invest)
-series invest_plast = plast(invest)
-series invest_pcum = pcum(invest)
-series invest_pmode = pmode(invest)
-series invest_pquantile = pquantile(invest, 0.5)
-series invest_pxquantile = pxquantile(invest, 0.5)
+# Select the variable (position in VAR) you want to plot over all equations
+scalar sel = 3
+scalar rectype = 0      # 0:forward, 1=backward
+scalar cilevel = 1.96
+string plotout = "display" # or: "PATH + FILENAME"
+scalar linew = 2
+scalar fsize = 12
 
-series invest_pxmean = pxmean(invest)
-series invest_pxfraction = pxfraction(invest, min(invest), FALSE)
-series invest_pxfraction_fraction = pxfraction(invest, min(invest), TRUE)
-
-
-print invest invest_* -o
-
-series invest_poly = ppolyfit(invest, 2)
-print invest invest_poly -o
-
-# Plot cross-sectional quantiles over time
-panplot_quantile(invest)
-
-# Tweak the plot
-bundle Plot = _(title = "Cross-sectional quantiles over time",
-                key_position = "outside below",
-                yrange_max = 450,
-                quantiles = {0.15, 0.5, 0.88}\
-                )
-panplot_quantile(invest, TRUE, Plot)
+#------------------
+# Run the procedure
+#------------------
+bundle Vb = setupVARrec(endo, exo, p, sel,
+                        rectype, cilevel, rob,
+                        plotout, fsize, linew)
+VARrec(&Vb)
+VARrecplot(&Vb)
