@@ -1,0 +1,76 @@
+# VARrec
+
+This package computes VAR model coefficient estimates recursively
+(backward or forward), and presents the results in a plot.
+
+Recursive parameter estimates are a simple descriptive tool for assessing
+parameter stability. They are obtained by estimating the model using only
+t=1,...,tau observations letting tau vary from some small value to T, the sample
+end (forward recursion). Backward recursion starts from the sub-sample t=T,...,
+tau and adds sequentially one observation until the first sample period is
+reached. Sequences of coefficient estimates are obtained.
+
+This package plots the sequence of all parameter estimates over time with its
+'confidence intervals'.
+
+
+
+# Public functions
+
+## setupVARrec()
+    Compute first valid value for each panel unit.
+
+    Parameters
+        y   - series, target series
+
+    Returns
+    Series with the first valid value of "y" for each cross-sectional unit. If no
+    valid values exists for a unit, NA is returned.
+
+## VARrec()
+
+
+## VARrecplot()
+
+
+
+
+
+
+
+ Input of bundle "b" for main function "VARrec":
+   b.mendo     -   matrix holding the ID of the endogenous
+   b.mexo      -   matrix holding the ID of the exogenous
+   b.rob       -   scalar for selecting robust S.E.: 0:NO, 1:"--robust", 2:"--robust-hac"
+   b.p     -   int of lag length (in levels)
+   b.sel       -   int select the variable (pos. in VAR) to evaluate
+   b.rectype   -   scalar, 0:"forward", 1:"backward" recursion
+   b.cilevel   -   scalar, S.E. for confidence interval
+   b.plotout   -   string, set path to folder e.g. "/home/USER/gretl" (figure name will start with "recVAR...") or select "display"
+   b.fsize     -   int (optional) font size of plots
+   b.linew     -   scalar (optional) linewidth of plots
+   b.verb      -   int (optional): 0=no print out, 1=print VAR estimates
+
+ Output of bundle "b":
+   b.coef      -   nstep by k matrix holding the point estimates of a variable for each of the k VAR equations
+   b.se        -   nstep by k matrix holding the S.E. of a variable for each of the k VAR equations
+
+
+# Changelog
+0.3 (11-2022)
+    - get rid of deprecated `sprintf` command
+0.24 (02-2017)
+0.23 (10-2016)
+   - Minor changes
+0.22 (10-2016)
+   - Minor changes
+   - Added the do_plot function
+0.21 (09-2016)
+    - Some minor changes w.r.t. to the VARrecplot function
+0.2 (09-2016)
+   - Add some hint s for the user in case of problems.
+   - Allow to manipulate the font size and line width of the plot
+0.1 (09-2016)
+   - Forward and backward recursive estimates
+   - Dummies are allowed. It is pre-tested whether the dummy takes
+       only zeros for the currently selected sub-sample or not.
