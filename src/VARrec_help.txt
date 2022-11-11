@@ -13,47 +13,54 @@ reached. Sequences of coefficient estimates are obtained.
 This package plots the sequence of all parameter estimates over time with its
 'confidence intervals'.
 
+Please ask questions and report bugs on the gretl mailing list if possible.
+Alternatively, create an issue ticket on the github repo (see below).
+Source code and test script(s) can be found here:
+https://github.com/atecon/VARrec
 
 
 # Public functions
 
 ## setupVARrec()
-    Compute first valid value for each panel unit.
+    Initially set up the bundle for the following analysis.
 
-    Parameters
-        y   - series, target series
+    Parameters:
+    endo        - list, Endogenous series
+    exo         - list, Exogenous series
+    p           - int, Lag length of the VAR in levels
+    which       - int, Position of variable in 'endo' to plot
+    rectype     - int, If 0 run recursion forward, if 1 then backward
+    cilevel     - scalar, Width of the confidence band in std. deviations
+    rob         - int, 0=none, 1= HC, 2=HAC robust std. errors
+    plotout     - string, Path+filename for storing plot or "display" for
+                  immediately showing up on screen
+    fsize       - int, Font size for plot
+    linew       - scalar, Line width for plot
+    verb        - int, 1=Print details, 0=Print no details
 
-    Returns
-    Series with the first valid value of "y" for each cross-sectional unit. If no
-    valid values exists for a unit, NA is returned.
+    Returns:
+    Bundle holding parameters.
 
 ## VARrec()
+    Function actually executing parameter estimates.
+
+    Parameters:
+    self        - bundle, Returned bundle in pointer form by the setupVARrec()
+                  function.
+
+    Returns:
+    Nothing.
 
 
 ## VARrecplot()
+    Function for plotting recursive parameter estimates.
+
+    Parameters:
+    self        - bundle, Returned by in pointer form by VARrec() the function
 
 
-
-
-
-
-
- Input of bundle "b" for main function "VARrec":
-   b.mendo     -   matrix holding the ID of the endogenous
-   b.mexo      -   matrix holding the ID of the exogenous
-   b.rob       -   scalar for selecting robust S.E.: 0:NO, 1:"--robust", 2:"--robust-hac"
-   b.p     -   int of lag length (in levels)
-   b.sel       -   int select the variable (pos. in VAR) to evaluate
-   b.rectype   -   scalar, 0:"forward", 1:"backward" recursion
-   b.cilevel   -   scalar, S.E. for confidence interval
-   b.plotout   -   string, set path to folder e.g. "/home/USER/gretl" (figure name will start with "recVAR...") or select "display"
-   b.fsize     -   int (optional) font size of plots
-   b.linew     -   scalar (optional) linewidth of plots
-   b.verb      -   int (optional): 0=no print out, 1=print VAR estimates
-
- Output of bundle "b":
-   b.coef      -   nstep by k matrix holding the point estimates of a variable for each of the k VAR equations
-   b.se        -   nstep by k matrix holding the S.E. of a variable for each of the k VAR equations
+    Return:
+    Error code which is zero (FALSE) in case of no error.
 
 
 # Changelog
